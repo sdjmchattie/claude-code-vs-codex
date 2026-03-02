@@ -1,0 +1,612 @@
+╭────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.106.0)                         │
+│                                                    │
+│ model:     gpt-5.3-codex medium   /model to change │
+│ directory: ~/Documents/Godot/Gorillas              │
+╰────────────────────────────────────────────────────╯
+
+  Tip: New Codex is included in your plan for free through March 2nd – let’s build together.
+
+
+› Do you remember the game for Quick Basic with gorillas hurling bananas across a city scape?  I want to recreate that in Godot and support dynamic generation of the city
+  skyline.  However, I'm happy to use a constant cityscape while getting the banana flight and explosion correct if that's easier.  Ask questions.
+
+
+• You want a plan to recreate QBASIC Gorillas in Godot, prioritizing banana physics/explosions first and skyline generation second. I’m going to inspect the current project
+  structure so I can ask targeted questions instead of generic ones.
+
+• Ran pwd && ls -la
+  └ /Users/user/Documents/Godot/Gorillas
+    total 48
+    … +7 lines
+    -rw-r--r--@ 1 user    staff  1012 Feb 28 22:30 icon.svg.import
+    -rw-r--r--@ 1 user    staff   499 Feb 28 22:30 project.godot
+
+• Explored
+  └ List rg --files
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The repo is essentially a fresh Godot project with no gameplay scenes/scripts yet, so we’ll need to define architecture and scope from scratch. I’m checking project.godot for
+  engine/version context, then I’ll ask focused design questions.
+
+• Questions 3/3 answered
+  • How closely should we match the original QBASIC Gorillas mechanics in the first playable version?
+    answer: Classic-first (Recommended)
+  • Which play mode should we target first?
+    answer: Local hotseat (Recommended)
+  • For banana flight behavior, what level of physical realism do you want?
+    answer: Godot RigidBody2D
+
+• Explored
+  └ Read project.godot
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Great, that locks core direction: classic-first, local hotseat, and RigidBody2D for projectile behavior. I’ll narrow down scope and interfaces next with a few implementation
+  decisions that will materially shape the plan.
+
+• Questions 3/3 answered
+  • For the first milestone, should skyline generation be included or deferred?
+    answer: Defer generation (Recommended)
+  • How should explosions interact with buildings in v1?
+    answer: Simple crater damage
+  • What input style should players use for throw angle and power?
+    answer: Typed values + launch (Recommended)
+
+• I have enough to structure the gameplay architecture; I need final product constraints (presentation and win loop) so the plan is decision-complete and implementable without
+  guesswork.
+
+• Questions 3/3 answered
+  • What art level should v1 target?
+    answer: Programmatic primitives (Recommended)
+  • How should a match be won in v1?
+    answer: First to N hits (Recommended)
+  • How should wind be communicated to players?
+    answer: Arrow + number
+
+• Proposed Plan
+
+
+  # Gorillas (Godot 4.5) Implementation Plan: Classic Core First, Procedural Skyline Later
+
+  ## Summary
+
+  Build a playable 2D local-hotseat artillery game inspired by QBASIC Gorillas with these locked decisions:
+
+  1. Classic-first mechanics.
+  2. Local hotseat only.
+  3. Banana flight using RigidBody2D.
+  4. Milestone 1 uses a fixed skyline.
+  5. Explosions create simple crater damage in buildings.
+  6. Input is numeric angle + velocity.
+  7. Programmatic primitive visuals.
+  8. Match winner is first to configurable hit count (default 3).
+  9. Wind shown as arrow + number.
+
+  Milestone 1 focuses on correct throw/explosion/hit loop and clean architecture so procedural skyline generation can be plugged in as Milestone 2.
+
+  ## Architecture and Scene Composition
+
+  1. Main.tscn (or Game.tscn) as root orchestrator.
+  2. Child nodes:
+  3. SkylineContainer (Node2D) to hold buildings.
+  4. PlayerA and PlayerB gorilla nodes (Node2D or CharacterBody2D used as static actors).
+  5. ProjectileLayer (Node2D) for banana spawn/lifecycle.
+  6. EffectsLayer (Node2D) for explosion VFX.
+  7. HUD (CanvasLayer) for angle/velocity input, turn state, score, wind indicator.
+  8. Optional DebugOverlay for trajectory/physics diagnostics (toggleable).
+
+  ## Core Systems
+
+  1. GameController.gd
+  2. Owns turn state machine, scoring, round resets, wind generation, win condition.
+  3. Phases: ROUND_SETUP -> TURN_INPUT -> PROJECTILE_IN_FLIGHT -> RESOLUTION -> NEXT_TURN/ROUND_END -> MATCH_END.
+  4. Prevents input while projectile is active.
+  5. Emits state changes to HUD.
+  6. PlayerController.gd
+  7. Stores player id, score, spawn point, facing direction.
+  8. Exposes request_throw(angle_deg, speed) called by GameController.
+  9. BananaProjectile.gd (RigidBody2D)
+  10. Spawned with initial linear velocity computed from angle/speed and player facing.
+  11. Wind applied as continuous horizontal force (deterministic per frame from current turn wind value).
+  12. Detects collisions with player/building/world bounds.
+  13. On impact, emits projectile_impacted(position, normal, hit_target) then queues free.
+  14. ExplosionSystem.gd
+  15. Spawns visual explosion and applies crater damage at impact.
+  16. Runs hit detection for gorillas within blast radius.
+  17. Returns resolution result: no_hit, hit_player_a, hit_player_b, self_hit.
+  18. Building.gd
+  19. Represents single skyline block with destructible mask.
+  20. Supports apply_crater(world_pos, radius):
+  21. Updates collision shape approximation and visual mesh/sprite mask.
+  22. Maintains simple damage model (circular subtraction).
+  23. WindSystem.gd
+  24. Generates per-turn wind scalar in configurable range (example -120..120 px/s^2 equivalent force mapping).
+  25. Provides both numeric value and direction for HUD arrow.
+
+  ## Public APIs / Interfaces / Types
+
+  1. Enums/constants:
+  2. TurnPhase enum in GameController.
+  3. HitResult enum in ExplosionSystem.
+  4. Data structures:
+  5. ThrowCommand (angle_deg: float, speed: float).
+  6. TurnContext (active_player_id: int, wind: float).
+  7. MatchConfig resource:
+  8. points_to_win: int = 3
+  9. min_angle/max_angle, min_speed/max_speed
+  10. wind_min/wind_max
+  11. explosion_radius
+  12. crater_radius
+  13. Signals:
+  14. GameController.turn_started(player_id, wind)
+  15. GameController.turn_resolved(hit_result, scores)
+  16. GameController.match_ended(winner_id)
+  17. BananaProjectile.projectile_impacted(position, hit_target)
+  18. Building.damaged() (for redraw/collider refresh)
+  19. HUD.throw_submitted(angle, speed)
+
+  ## Gameplay Rules (Milestone 1)
+
+  1. Each turn: active player enters numeric angle + velocity, launches once.
+  2. Wind is constant during that turn only.
+  3. Banana follows RigidBody2D physics with added horizontal wind force.
+  4. First collision triggers explosion and crater.
+  5. If explosion radius overlaps opponent gorilla, shooter scores 1.
+  6. If self-hit, opponent scores 1.
+  7. Round resets actor/projectile positions and keeps cumulative score.
+  8. Match ends when a player reaches points_to_win.
+
+  ## Skyline Strategy
+
+  1. Milestone 1: fixed skyline layout from static config array (building x/width/height values).
+  2. Keep generator interface from day one:
+  3. ISkylineProvider-style contract (implemented as script API):
+  4. generate(seed) -> Array[BuildingSpec].
+  5. Use FixedSkylineProvider now.
+  6. Milestone 2 adds ProceduralSkylineProvider (random widths/heights/gaps, spawn-safe rooftop zones).
+
+  ## UI/UX Plan
+
+  1. HUD fields:
+  2. Active player label.
+  3. Numeric input for angle and velocity.
+  4. Wind arrow + numeric strength.
+  5. Scoreboard and target points.
+  6. Launch button and input validation feedback.
+  7. Disable controls during projectile flight and resolution.
+  8. Keep restart/new match button on match end state.
+
+  ## Testing and Validation
+
+  1. Unit-style script tests (or lightweight runtime assertions):
+  2. Angle/speed conversion yields expected initial velocity vectors.
+  3. Wind mapping applies correct force direction and magnitude.
+  4. Turn state machine forbids invalid transitions (no double launch).
+  5. Score updates correctly on opponent hit and self-hit.
+  6. Integration/manual scenarios:
+  7. Flat no-wind throw hits expected parabola baseline.
+  8. Positive wind and negative wind visibly alter horizontal drift.
+  9. Projectile impacts building and crater appears at collision point.
+  10. Consecutive hits reach win threshold and trigger match end UI.
+  11. Invalid input (out of range/non-numeric) blocked with clear message.
+  12. Turn alternation remains correct even after misses and self-hits.
+  13. Acceptance criteria:
+  14. Core loop is playable start-to-finish without editor intervention.
+  15. At least one building can be cratered multiple times.
+  16. Wind indicator matches observed drift direction.
+  17. Match restart resets scores and scene state cleanly.
+
+  ## Milestone Breakdown
+
+  1. Milestone 1A: Scene scaffolding, turn state machine, HUD numeric input, player placement.
+  2. Milestone 1B: RigidBody2D banana launch + wind + collision callbacks.
+  3. Milestone 1C: Explosion VFX + crater damage + hit resolution/scoring.
+  4. Milestone 1D: Match flow polish, restart flow, config resource tuning, test pass.
+  5. Milestone 2: Swap fixed skyline provider with procedural generator while preserving interfaces.
+
+  ## Assumptions and Defaults
+
+  1. Engine: Godot 4.5 (from current project config).
+  2. Desktop-first local play; no networking or AI in this plan.
+  3. Primitive visuals are acceptable for v1.
+  4. Crater damage is “simple” geometric subtraction, not structural physics.
+  5. Determinism target is gameplay-consistent, not strict lockstep across platforms.
+  6. Audio is optional for v1 and not required for acceptance.
+
+
+
+› Implement the plan.
+
+
+• I’m implementing the plan directly in this project now: creating the core scenes/scripts for turn flow, banana physics with wind, cratered buildings, HUD inputs, and match
+  loop. I’ll build a playable baseline first, then run a quick sanity check of file integrity.
+
+• Explored
+  └ List ls -la
+    List .
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve mapped the concrete Godot implementation and am now creating the actual scene/script files. The key technical choice is bitmap-based buildings so crater damage is both
+  visible and collidable without complex polygon math.
+
+• Ran mkdir -p scenes scripts
+  └ (no output)
+
+• Ran cat > scripts/match_config.gd <<'EOF'
+  │ extends Resource
+  │ class_name MatchConfig
+  │ … +12 lines
+  └ (no output)
+
+• Ran cat > scripts/wind_system.gd <<'EOF'
+  │ extends Node
+  │ class_name WindSystem
+  │ … +9 lines
+  └ (no output)
+
+• Ran cat > scripts/fixed_skyline_provider.gd <<'EOF'
+  │ extends Node
+  │ class_name FixedSkylineProvider
+  │ … +24 lines
+  └ (no output)
+
+• Ran cat > scripts/building.gd <<'EOF'
+  │ extends Node2D
+  │ class_name Building
+  │ … +70 lines
+  └ (no output)
+
+• Ran cat > scripts/player_controller.gd <<'EOF'
+  │ extends StaticBody2D
+  │ class_name PlayerController
+  │ … +13 lines
+  └ (no output)
+
+• Ran cat > scripts/banana_projectile.gd <<'EOF'
+  │ extends RigidBody2D
+  │ class_name BananaProjectile
+  │ … +39 lines
+  └ (no output)
+
+• Ran cat > scripts/explosion_system.gd <<'EOF'
+  │ extends Node
+  │ class_name ExplosionSystem
+  │ … +64 lines
+  └ (no output)
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve finished the core gameplay scripts and I’m now wiring scenes and HUD signals so turn flow, launch, scoring, and match-end states are playable end-to-end.
+
+• Ran cat > scripts/hud.gd <<'EOF'
+  │ extends CanvasLayer
+  │ class_name HUD
+  │ … +59 lines
+  └ (no output)
+
+• Ran cat > scripts/game_controller.gd <<'EOF'
+  │ extends Node2D
+  │
+  │ … +176 lines
+  └ (no output)
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’m now wiring the .tscn files and node references, then setting Game.tscn as the startup scene so you can run immediately. After that I’ll do a quick static parse check.
+
+• Ran cat > scenes/Building.tscn <<'EOF'
+  │ [gd_scene load_steps=3 format=3]
+  │
+  │ … +10 lines
+  └ (no output)
+
+• Ran cat > scenes/Player.tscn <<'EOF'
+  │ [gd_scene load_steps=4 format=3]
+  │
+  │ … +18 lines
+  └ (no output)
+
+• Ran cat > scenes/BananaProjectile.tscn <<'EOF'
+  │ [gd_scene load_steps=4 format=3]
+  │
+  │ … +17 lines
+  └ (no output)
+
+• Ran cat > scenes/HUD.tscn <<'EOF'
+  │ [gd_scene load_steps=2 format=3]
+  │
+  │ … +71 lines
+  └ (no output)
+
+• Ran cat > scenes/Game.tscn <<'EOF'
+  │ [gd_scene load_steps=7 format=3]
+  │
+  │ … +63 lines
+  └ (no output)
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve generated all core files. Next I’m updating project startup config and then running a static Godot parse-style check using available commands to catch syntax issues early.
+
+• Edited project.godot (+1 -0)
+    15  config/icon="res://icon.svg"
+    16 +run/main_scene="res://scenes/Game.tscn"
+    17
+
+• Ran godot --headless --path . --quit
+  └ zsh:1: command not found: godot
+
+• Explored
+  └ List scenes
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• All project files are in place; the only blocker on runtime verification is that godot CLI isn’t installed in this shell. I’ll do a quick textual pass for likely GDScript
+  issues and report exact files changed plus any residual risk.
+
+• Explored
+  └ Read game_controller.gd, explosion_system.gd, building.gd, hud.gd
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I spotted a likely Godot scene-format risk in how the config resource was embedded, so I’m switching it to a standalone .tres for reliability and cleaner tuning in-editor.
+
+• Ran mkdir -p configs && cat > configs/match_config.tres <<'EOF'
+  │ [gd_resource type="Resource" script_class="MatchConfig" load_steps=2 format=3]
+  │
+  │ … +15 lines
+  └ (no output)
+
+• Edited scenes/Game.tscn (+2 -14)
+     7  [ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="5"]
+     8 -[ext_resource type="Script" path="res://scripts/match_config.gd" id="6"]
+     9 -
+    10 -[sub_resource type="Resource" id="1" script=ExtResource("6")]
+    11 -points_to_win = 3
+    12 -min_angle_deg = 1.0
+    13 -max_angle_deg = 89.0
+    14 -min_speed = 150.0
+    15 -max_speed = 900.0
+    16 -wind_min = -140.0
+    17 -wind_max = 140.0
+    18 -explosion_radius = 36.0
+    19 -crater_radius = 30.0
+    20 -gravity_scale = 1.0
+     8 +[ext_resource type="Resource" path="res://configs/match_config.tres" id="6"]
+     9
+       ⋮
+    11  script = ExtResource("1")
+    24 -config = SubResource("1")
+    12 +config = ExtResource("6")
+    13
+
+• Explored
+  └ Read Game.tscn, match_config.tres, banana_projectile.gd
+
+• Ran git status --short
+  └ fatal: not a git repository (or any of the parent directories): .git
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I found one likely typed-signal edge case (projectile out-of-bounds emits null), so I’m making that callback argument Variant to avoid runtime type errors.
+
+• Edited scripts/banana_projectile.gd (+2 -2)
+     3
+     4 -signal projectile_impacted(position: Vector2, hit_target: Node)
+     4 +signal projectile_impacted(position: Vector2, hit_target: Variant)
+     5
+       ⋮
+    33
+    34 -func _emit_impact(hit_target: Node) -> void:
+    34 +func _emit_impact(hit_target: Variant) -> void:
+    35  	if _impacted:
+
+• Edited scripts/game_controller.gd (+1 -1)
+    124
+    125 -func _on_projectile_impacted(impact_position: Vector2, _hit_target: Node) -> void:
+    125 +func _on_projectile_impacted(impact_position: Vector2, _hit_target: Variant) -> void:
+    126  	if _phase != TurnPhase.PROJECTILE_IN_FLIGHT:
+
+• Explored
+  └ List scenes
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Implemented the plan as a runnable Godot 4.5 baseline with classic hotseat flow, RigidBody2D banana physics + wind, explosion/crater damage, HUD inputs, scoring, and match end.
+
+  Key files added/updated:
+
+  - Main scene + wiring: scenes/Game.tscn
+  - Game loop/state/scoring: scripts/game_controller.gd
+  - Projectile physics: scripts/banana_projectile.gd
+  - Explosion + hit resolution + crater calls: scripts/explosion_system.gd
+  - Destructible bitmap buildings (visual + collision rebuild): scripts/building.gd
+  - Fixed skyline provider: scripts/fixed_skyline_provider.gd
+  - HUD + typed angle/velocity launch UI: scenes/HUD.tscn, scripts/hud.gd
+  - Match tuning resource: configs/match_config.tres
+  - Startup scene configured: project.godot
+
+  What’s implemented:
+
+  - Local 2-player hotseat turn loop.
+  - Numeric angle/velocity input with validation.
+  - Per-turn wind with arrow + numeric HUD display.
+  - Banana launched from each gorilla, affected by gravity + wind force.
+  - Collision/out-of-bounds impact handling.
+  - Explosion VFX and crater carving into buildings.
+  - Score updates including self-hit behavior.
+  - First-to-N (default 3) win condition + New Match button.
+
+  Verification status:
+
+  - I could not run a headless engine check because godot CLI is not installed in this shell (command not found).
+  - Static implementation pass completed; no further automated runtime validation was possible here.
+
+  Next steps:
+
+  1. Open the project in Godot and run Game.tscn to tune feel values in configs/match_config.tres.
+  2. If you want, I can add Milestone 2 next: procedural skyline generation using the existing provider interface.
+
+
+› The projectile hits the player that threw it as soon as its launched
+
+
+• I found the cause: the banana spawns overlapping the thrower’s collision shape on frame 1. I’m adjusting the launch marker upward so the projectile starts fully clear of the
+  player collider (without disabling valid future self-collisions).
+
+• Edited scenes/Player.tscn (+1 -1)
+    18  [node name="LaunchPoint" type="Marker2D" parent="."]
+    19 -position = Vector2(0, -14)
+    19 +position = Vector2(0, -22)
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Fixed by moving the banana spawn point above the gorilla collider so launch no longer starts in-contact.
+
+  Updated:
+
+  - scenes/Player.tscn
+
+  Change:
+
+  - LaunchPoint moved from Vector2(0, -14) to Vector2(0, -22).
+
+  This preserves legitimate later self-hits (for example from wind-curved return shots) while removing the immediate launch collision.
+
+
+› The second player is off the screen
+
+
+• You’re right; spawn selection was using near-end skyline indices, which can place Player 2 past the visible viewport. I’m changing spawn logic to pick two rooftop buildings
+  that are confirmed on-screen (roughly left and right thirds).
+
+• Edited scripts/game_controller.gd (+41 -2)
+     72
+     73 -	_spawn_player(0, _buildings[1])
+     74 -	_spawn_player(1, _buildings[_buildings.size() - 2])
+     73 +	var spawn_pair := _pick_spawn_buildings(view_size.x)
+     74 +	_spawn_player(0, spawn_pair[0])
+     75 +	_spawn_player(1, spawn_pair[1])
+     76
+        ⋮
+    175
+    176 +func _pick_spawn_buildings(viewport_width: float) -> Array[Building]:
+    177 +	var visible: Array[Building] = []
+    178 +	for building in _buildings:
+    179 +		var center_x: float = building.position.x + (building.size.x * 0.5)
+    180 +		if center_x >= 0.0 and center_x <= viewport_width:
+    181 +			visible.append(building)
+    182 +
+    183 +	if visible.size() < 2:
+    184 +		return [_buildings[0], _buildings[_buildings.size() - 1]]
+    185 +
+    186 +	var left_target: float = viewport_width * 0.2
+    187 +	var right_target: float = viewport_width * 0.8
+    188 +	var left_choice: Building = visible[0]
+    189 +	var right_choice: Building = visible[visible.size() - 1]
+    190 +	var left_best: float = INF
+    191 +	var right_best: float = INF
+    192 +
+    193 +	for building in visible:
+    194 +		var center_x: float = building.position.x + (building.size.x * 0.5)
+    195 +		var left_distance: float = absf(center_x - left_target)
+    196 +		if left_distance < left_best:
+    197 +			left_best = left_distance
+    198 +			left_choice = building
+    199 +		var right_distance: float = absf(center_x - right_target)
+    200 +		if right_distance < right_best:
+    201 +			right_best = right_distance
+    202 +			right_choice = building
+    203 +
+    204 +	if left_choice == right_choice:
+    205 +		var left_index: int = visible.find(left_choice)
+    206 +		var alt_index: int = clampi(left_index + 1, 0, visible.size() - 1)
+    207 +		right_choice = visible[alt_index]
+    208 +		if right_choice == left_choice:
+    209 +			alt_index = clampi(left_index - 1, 0, visible.size() - 1)
+    210 +			right_choice = visible[alt_index]
+    211 +
+    212 +	return [left_choice, right_choice]
+    213 +
+    214  func _clear_children(node: Node) -> void:
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Fixed spawn selection so both players are placed on visible rooftops.
+
+  Updated:
+
+  - scripts/game_controller.gd
+
+  What changed:
+
+  - Replaced hardcoded spawn indices with _pick_spawn_buildings(viewport_width).
+  - It now:
+      - Filters to buildings whose center is on-screen.
+      - Picks left/right spawn buildings near 20% and 80% of screen width.
+      - Falls back safely if visibility is limited.
+
+  This should keep Player 2 on-screen consistently.
+
+
+› Explain how buildings work? I see they manage damage, but it's hard for me to follow.
+
+
+• I’ll walk through the building damage pipeline step-by-step using the current script with line references so it’s easier to map code to behavior.
+
+• Explored
+  └ Read building.gd, Building.tscn
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Buildings are a single bitmap that drives both visuals and collision.
+
+  Flow in building.gd:
+
+  1. Setup
+
+  - size and building_color define dimensions/color (line 4:4, line 5:5).
+  - On ready, _rebuild_bitmap() creates an Image filled with that color (line 15:15, line 47:47).
+
+  2. Damage (crater)
+
+  - apply_crater(world_pos, radius) converts explosion world position into building-local coordinates (line 24:24, line 25:25).
+  - It loops pixels in a bounding box and clears pixels inside the circle (alpha = 0) (line 34:34 to line 41:41).
+  - If anything changed, it refreshes render + collision (line 43:43 to line 45:45).
+
+  3. Visual refresh
+
+  - _refresh_visual_and_collision() uploads the modified Image into an ImageTexture, then assigns it to Sprite2D (line 52:52 to line 58:58).
+
+  4. Collision refresh
+
+  - It deletes old collision polygons (line 60:60 to line 61:61).
+  - It converts opaque pixels in the image into polygons (BitMap.opaque_to_polygons) and creates new CollisionPolygon2D children (line 63:63 to line 71:71).
+
+  Scene structure is minimal in Building.tscn: one Sprite2D for drawing and one StaticBody2D that gets generated polygon colliders.
+
+  If helpful, I can also annotate this file with short comments directly in-code so it’s easier to maintain.
+
+
+› Is BitMap.opaque_to_polygons a built in method?
+
+
+• Yes. BitMap.opaque_to_polygons(...) is a built-in Godot method on the BitMap class (used to convert opaque image regions into polygon outlines).
+
+
+› I see. And by removing old children of the StaticBody2D and adding a new one in from the output of that method, you get an irregularly shaped collision shape.  Therefore past
+  explosions provide a channel through which projectiles can pass without exploding.
+
+
+• Exactly.
+
+  That rebuild step makes the collider match the current non-transparent pixels, so crater holes become real gaps in collision. Projectiles can pass through those gaps because
+  there’s no collider there anymore.
+
+
+› Find and fix a bug in @filename
+
+  gpt-5.3-codex medium · 91% left · ~/Documents/Godot/Gorillas

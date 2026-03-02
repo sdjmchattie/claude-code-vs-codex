@@ -1,0 +1,72 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/hud.gd" id="1"]
+
+[node name="HUD" type="CanvasLayer"]
+script = ExtResource("1")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="Root"]
+layout_mode = 1
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 360.0
+offset_bottom = 220.0
+
+[node name="VBox" type="VBoxContainer" parent="Root/Panel"]
+layout_mode = 2
+
+[node name="ActivePlayerLabel" type="Label" parent="Root/Panel/VBox"]
+unique_name_in_owner = true
+text = "Player 1 Turn"
+
+[node name="ScoreLabel" type="Label" parent="Root/Panel/VBox"]
+unique_name_in_owner = true
+text = "P1 0 - P2 0"
+
+[node name="WindRow" type="HBoxContainer" parent="Root/Panel/VBox"]
+layout_mode = 2
+
+[node name="WindLabel" type="Label" parent="Root/Panel/VBox/WindRow"]
+unique_name_in_owner = true
+text = "Wind: +0"
+
+[node name="WindArrowLabel" type="Label" parent="Root/Panel/VBox/WindRow"]
+unique_name_in_owner = true
+text = "Wind: ->"
+
+[node name="InputRow" type="HBoxContainer" parent="Root/Panel/VBox"]
+layout_mode = 2
+
+[node name="AngleInput" type="LineEdit" parent="Root/Panel/VBox/InputRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+text = "45"
+placeholder_text = "Angle"
+
+[node name="SpeedInput" type="LineEdit" parent="Root/Panel/VBox/InputRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+text = "520"
+placeholder_text = "Velocity"
+
+[node name="LaunchButton" type="Button" parent="Root/Panel/VBox/InputRow"]
+unique_name_in_owner = true
+text = "Launch"
+
+[node name="MessageLabel" type="Label" parent="Root/Panel/VBox"]
+unique_name_in_owner = true
+text = "Enter angle and velocity."
+autowrap_mode = 3
+
+[node name="RestartButton" type="Button" parent="Root/Panel/VBox"]
+unique_name_in_owner = true
+visible = false
+text = "New Match"

@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/banana_projectile.gd" id="1"]
+
+[sub_resource type="CircleShape2D" id="1"]
+radius = 5.0
+
+[node name="BananaProjectile" type="RigidBody2D"]
+script = ExtResource("1")
+continuous_cd = true
+physics_material_override = null
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("1")
+
+[node name="Polygon2D" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(5, 0, 4, 3, 1, 5, -2, 4, -5, 0, -3, -3, 1, -5, 4, -3)
+color = Color(0.992157, 0.901961, 0.278431, 1)

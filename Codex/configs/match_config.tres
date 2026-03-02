@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MatchConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/match_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+points_to_win = 3
+min_angle_deg = 1.0
+max_angle_deg = 89.0
+min_speed = 150.0
+max_speed = 900.0
+wind_min = -140.0
+wind_max = 140.0
+explosion_radius = 36.0
+crater_radius = 30.0
+gravity_scale = 1.0

@@ -1,0 +1,52 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/game_controller.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/wind_system.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/fixed_skyline_provider.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/explosion_system.gd" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="5"]
+[ext_resource type="Resource" path="res://configs/match_config.tres" id="6"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1")
+config = ExtResource("6")
+
+[node name="Sky" type="ColorRect" parent="."]
+offset_left = -10.0
+offset_top = -10.0
+offset_right = 2000.0
+offset_bottom = 1200.0
+color = Color(0.0588235, 0.0941176, 0.152941, 1)
+
+[node name="SkylineContainer" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="Ground" type="ColorRect" parent="."]
+offset_top = 640.0
+offset_right = 2000.0
+offset_bottom = 1000.0
+color = Color(0.0784314, 0.14902, 0.0784314, 1)
+
+[node name="ActorsContainer" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="ProjectileLayer" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="EffectsLayer" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="WindSystem" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("2")
+
+[node name="FixedSkylineProvider" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("3")
+
+[node name="ExplosionSystem" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("4")
+
+[node name="HUD" parent="." instance=ExtResource("5")]
+unique_name_in_owner = true
